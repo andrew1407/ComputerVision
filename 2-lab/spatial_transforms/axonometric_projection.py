@@ -20,7 +20,7 @@ def axonometric_projection(figure: np.ndarray, angles=tuple[float, ...], parse: 
   mtx_second = np.array([
     [1, 0, 0, 0],
     [0, cos_second, sin_second, 0],
-    [0, sin_second, cos_second, 0],
+    [0, -sin_second, cos_second, 0],
     [0, 0, 0, 0],
   ])
   transformer = lambda coords: coords.dot(mtx_first).dot(mtx_second)

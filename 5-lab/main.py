@@ -18,7 +18,7 @@ def draw_lines(wnd, mtx, offset):
       if mtx[y, x] == 0: continue
       xi = x + offset_x
       yi = y + offset_y
-      if 0 > xi > WINDOW_WIDTH or 0 > yi > WINDOW_HEIGHT:
+      if not 0 <= xi < WINDOW_WIDTH or not 0 <= yi < WINDOW_HEIGHT:
         continue
       p = Point(xi, yi)
       p.setFill(fill_color)

@@ -2,7 +2,7 @@ import numpy as np
 
 
 def sierpinski_carpet(level: int, size: int) -> np.ndarray:
-  carpet_mtx = np.ones((size, size), np.int0)
+  carpet_mtx = np.ones((size, size), np.intp)
   for i in range(0, level + 1):
     stepdown = 3 ** (level - i)
     range_finish = 3 ** i

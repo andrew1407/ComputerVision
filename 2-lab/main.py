@@ -18,7 +18,8 @@ OUTLINE_COLOR = '#0000ff'
 FILL_START_COLOR = BACKGROUND_COLOR
 FILL_FINISH_COLOR = '#ff99cc'
 
-PROJECTION_ANGLES = mt.pi / 3, -mt.pi / 4
+# positive second angle keeps the rotated pyramid inside the window (y grows downwards)
+PROJECTION_ANGLES = mt.pi / 3, mt.pi / 4
 ROTATION_COORDS = 1, 0, 0
 ROTATION_ANGLE = .02
 

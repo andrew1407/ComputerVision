@@ -10,8 +10,9 @@
 
 A collection of computer-graphics and computer-vision labs in **Python**, progressing
 from raster primitives and 3D projections to OpenCV image processing and YOLO object
-detection. Real-time rendering is done with OpenGL/GLUT through the shared `graphics`
-module; image work uses OpenCV, NumPy and Matplotlib.
+detection. Labs 1–5 and the control task draw with a Tkinter-based `graphics.py` (John
+Zelle's graphics library); lab 6 renders in real time with OpenGL/GLUT; image work uses
+OpenCV, NumPy and Matplotlib.
 
 ## Labs
 
@@ -30,12 +31,11 @@ module; image work uses OpenCV, NumPy and Matplotlib.
 
 ## Showcase
 
-**[Open the labs in the browser](https://andrew1407.github.io/ComputerVision/)**. Every lab except 9 runs its own Python source in [PyScript](https://pyscript.net) (Pyodide), with editable parameters, and every drawing, image, chart, table and result can be copied.
+**[Open the labs in the browser](https://andrew1407.github.io/ComputerVision/)**. Every lab runs its own Python source in [PyScript](https://pyscript.net) (Pyodide), with editable parameters, and every drawing, image, chart, table and result can be copied.
 
 - **Labs 1–5 and `control-task`** run their `main.py` and `graphics.py` unchanged. [`web/shims/tkinter.py`](web/shims/tkinter.py) stands in for Tk and records every canvas call, and `time.sleep` advances a virtual clock. The page replays the drawing on an HTML canvas at the lab's timing, including the click `getMouse()` waits for.
 - **Lab 6** runs `bearing.py` and `hollow_cylinder.py` unchanged against [`web/shims/OpenGL`](web/shims/OpenGL), a stand-in for PyOpenGL. The page calls the lab's GLUT display callback every animation frame and draws the result with WebGL, using OpenGL 1.x's fixed-function lighting. That part is a port, because browsers have no desktop OpenGL.
 - **Labs 7 and 8** call the labs' OpenCV and SciPy functions on the repo's images or an uploaded one. The page draws the images and histograms that matplotlib would show.
-- **Lab 9** (YOLOv3) isn't included: it needs a 240 MB model and a video.
 
 [`web/showcase.py`](web/showcase.py) loads the labs. Run it locally:
 
@@ -50,7 +50,7 @@ The [pages workflow](.github/workflows/pages.yml) deploys it on every push to `m
 ## Stack
 
 - **Python** with **NumPy** and `math` for the geometry
-- **PyOpenGL** (GLUT) for real-time rendering via the local `graphics` module
+- **Tkinter** through the local `graphics.py` for the 2D drawing labs, and **PyOpenGL** (GLUT) for lab 6's real-time rendering
 - **OpenCV** (`cv2`) and **Matplotlib** for image processing and visualization
 
 ## Run

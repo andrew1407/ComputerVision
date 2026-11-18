@@ -847,14 +847,13 @@ const LABS = [
       num('delay', 'DRAW_DELAY_SEC', 0.2, 0, 5, { assign: 'DRAW_DELAY_SEC' }, { step: 'any' }),
       num('rot', 'ROTATION_ANGLE', 0.02, -1, 1, { assign: 'ROTATION_ANGLE' }, { step: 'any' }),
       expr('axis', 'ROTATION_COORDS', '1, 0, 0', { assign: 'ROTATION_COORDS' }),
-      expr('proj', 'PROJECTION_ANGLES', 'mt.pi / 3, -mt.pi / 4', { assign: 'PROJECTION_ANGLES' }),
+      expr('proj', 'PROJECTION_ANGLES', 'mt.pi / 3, mt.pi / 4', { assign: 'PROJECTION_ANGLES' }),
       expr('proj1', 'projection_angles (window 1)', '(1, -0.1)', { kw: 'projection_angles' }),
       ...pyramid('720, 300, 10', '680, 300, 80', '770, 350, 80', '700, 200, 50'),
       color('bg', 'BACKGROUND_COLOR', '#ffff00', { assign: 'BACKGROUND_COLOR' }),
       color('outline', 'OUTLINE_COLOR', '#0000ff', { assign: 'OUTLINE_COLOR' }),
       color('fill', 'FILL_FINISH_COLOR', '#ff99cc', { assign: 'FILL_FINISH_COLOR' }),
     ],
-    notes: ['<p class="note bug"><b>Lab quirks, kept as they are.</b> <code>custom_rotation</code> divides the axis by √(n₁ + n₂ + n₃) rather than √(n₁² + n₂² + n₃²), so only axes like (1, 0, 0) stay unit length. It also rotates the already rotated pyramid by a growing angle each frame, so the spin speeds up. In <code>axonometric_projection</code> the second matrix has <code>sin</code> where a rotation needs <code>−sin</code>, which skews the projection a little.</p>'],
     run: gfx('2-lab'), render: graphicsView, mount: 'tk',
   },
   {
@@ -894,10 +893,6 @@ const LABS = [
       expr('g', 'g (trunk angle)', 'mt.radians(270)', { kw: 'g' }),
       num('w', 'WINDOW_WIDTH', 700, 100, 1600, { assign: 'WINDOW_WIDTH' }),
       num('h', 'WINDOW_HEIGHT', 500, 100, 1200, { assign: 'WINDOW_HEIGHT' }),
-    ],
-    notes: [
-      '<p class="note port"><b>NumPy 2.</b> <code>sierpinski_carpet</code> uses <code>np.int0</code>, which NumPy 2 removed. Pyodide ships NumPy 2.4, so the page adds <code>np.int0 = np.intp</code> back before the lab runs. The source is unchanged.</p>',
-      '<p class="note bug"><b>Lab bug, kept.</b> The bounds check <code>0 &gt; xi &gt; WINDOW_WIDTH</code> is never true, so carpet points past the window edge are still drawn (Tk clips them).</p>',
     ],
     hint: 'About 100,000 points: the carpet is replayed in drawing order. Level 6 would be 9 times more, so the level is capped at 5, the lab\'s value.',
     run: gfx('5-lab'), render: graphicsView, mount: 'tk',
@@ -973,15 +968,8 @@ const LABS = [
       color('fill', 'fill_color', '#00ffff', { assign: 'fill_color' }),
       color('bg', 'bkg_color', '#ffff00', { assign: 'bkg_color' }),
     ],
-    notes: ['<p class="note bug"><b>Lab bug, kept.</b> <code>mk_faces_containers</code> takes <code>np.arccos</code> (radians) and compares it with <code>90</code>, so a normal is never flipped to point outwards. With the default pyramid the result is still the one the lab expects.</p>'],
     hint: 'The colours default to the lab\'s <code>\'aqua\'</code> and <code>\'yellow\'</code>, the same colours as hex values.',
     run: gfx('control-task'), render: graphicsView, mount: 'tk', colorTable: false,
-  },
-  {
-    id: 'lab9', tab: '9', dir: '9-lab', name: 'YOLO detection', lang: 'cv', src: `${SRC}/9-lab/main.py`, skip: true,
-    intro: 'Detects and counts vehicles in a highway video with YOLOv3-320 through OpenCV\'s DNN module (<code>cv2.dnn.readNetFromDarknet</code>), with confidence and non-maximum-suppression thresholds.',
-    notes: ['<p class="note"><b>Not included.</b> The lab needs the YOLOv3 weights (about 240 MB, not in the repo) and a video file, which is too much to load in a browser page. Run it locally with the model in <code>9-lab/model/</code>.</p>'],
-    fields: [],
   },
 ];
 
@@ -1018,22 +1006,20 @@ function build() {
     b.type = 'button'; b.role = 'tab'; b.dataset.lab = lab.id;
     b.setAttribute('aria-controls', `panel-${lab.id}`);
     b.innerHTML = `<span class="lang ${lab.lang}">${short}</span>${labName(lab)}<span class="long muted" style="font-weight:400">· ${esc(lab.name)}</span>`;
-    if (lab.skip) b.classList.add('skip');
     b.onclick = () => select(lab.id, true);
     nav.appendChild(b);
 
     const sec = document.createElement('section');
-    sec.className = `panel${lab.skip ? ' skip' : ''}`; sec.id = `panel-${lab.id}`; sec.role = 'tabpanel'; sec.hidden = true;
+    sec.className = 'panel'; sec.id = `panel-${lab.id}`; sec.role = 'tabpanel'; sec.hidden = true;
     const notes = [...(lab.mount === 'tk' ? [TK_NOTE] : []), ...(lab.notes || [])];
     sec.innerHTML = `<div class="lab-head"><span class="lang ${lab.lang}">${long}</span><h3>${labName(lab)}: ${esc(lab.name)}</h3><a href="${lab.src}" target="_blank" rel="noopener">View source</a></div>
       <p class="intro">${lab.intro}</p>
       ${notes.length ? `<div class="notes">${notes.join('')}</div>` : ''}
-      ${lab.skip ? '' : `<form class="params" novalidate>${lab.fields.map((f) => fieldHtml(lab, f)).join('')}<button class="run" type="submit">Run</button><button class="mini" type="button" data-reset title="Put the lab's own values back">Defaults</button></form>`}
+      <form class="params" novalidate>${lab.fields.map((f) => fieldHtml(lab, f)).join('')}<button class="run" type="submit">Run</button><button class="mini" type="button" data-reset title="Put the lab's own values back">Defaults</button></form>
       ${lab.hint ? `<p class="hint">${lab.hint}</p>` : ''}
       <div class="out" style="margin-top:18px"></div>`;
     main.appendChild(sec);
     state.set(lab.id, { ran: false, running: false });
-    if (lab.skip) continue;
 
     const form = $('form', sec);
     const sync = () => sec.querySelectorAll('[data-when]').forEach((el) => {
@@ -1104,7 +1090,6 @@ function select(id, push) {
   main.querySelectorAll('section.panel[role="tabpanel"]').forEach((s) => s.hidden = s.id !== `panel-${lab.id}`);
   if (push) try { history.replaceState(null, '', `#${lab.id}`); } catch {}
   document.title = `${labName(lab)} · Computer Vision Labs`;
-  if (lab.skip) return;
   if (!state.get(lab.id).ran) run(lab);
   else drawCharts($(`#panel-${lab.id}`));
 }

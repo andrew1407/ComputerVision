@@ -36,12 +36,6 @@ sys.path.insert(0, SHIMS_DIR)
 import tkinter as tk_shim  # noqa: E402  (shims/tkinter.py, there's no Tk in Pyodide)
 from OpenGL import _state as gl_state  # noqa: E402
 
-NOTES = []
-# NumPy 2 removed the np.int0 alias that 5-lab/fractals/sierpinski_carpet.py uses.
-if not hasattr(np, 'int0'):
-  np.int0 = np.intp
-  NOTES.append('np.int0')
-
 _LAB_MODULES = set()  # module names imported from a lab folder, dropped before the next run
 
 
@@ -174,7 +168,7 @@ def _pack_window(win):
 def graphics(lab, assign=None, kw=None):
   ns, stdout, elapsed = run_main(lab, assign, kw)
   windows = [_pack_window(w.export()) for w in tk_shim.windows]
-  return dict(windows=windows, stdout=stdout, ms=round(elapsed * 1000, 1), notes=NOTES if lab == '5-lab' else [])
+  return dict(windows=windows, stdout=stdout, ms=round(elapsed * 1000, 1))
 
 
 # ------------------------------------------------------------ OpenGL lab --

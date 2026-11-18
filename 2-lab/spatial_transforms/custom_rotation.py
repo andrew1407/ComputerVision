@@ -5,14 +5,14 @@ import math as mt
 def __generate_rotation_matrix(angle: float, rotation_coords: tuple[float, ...]) -> np.ndarray:
   angle_cos = mt.cos(angle)
   angle_sin = mt.sin(angle)
-  direction_param = mt.sqrt(sum(rotation_coords))
+  direction_param = mt.sqrt(sum(p ** 2 for p in rotation_coords))
   n1, n2, n3 = tuple(p / direction_param for p in rotation_coords)
   n1_pow, n2_pow, n3_pow = tuple(p ** 2 for p in (n1, n2, n3))
   n1n2 = n1 * n2
   n1n3 = n1 * n3
   n2n3 = n2 * n3
   return np.array([
-    [n1_pow + (1 - n1_pow) * angle_cos, n1n2 * (1 - angle_cos) + n3 * angle_sin, n1n3 * (1 - angle_cos) + n2 * angle_sin, 0],
+    [n1_pow + (1 - n1_pow) * angle_cos, n1n2 * (1 - angle_cos) + n3 * angle_sin, n1n3 * (1 - angle_cos) - n2 * angle_sin, 0],
     [n1n2 * (1 - angle_cos) - n3 * angle_sin, n2_pow + (1 - n2_pow) * angle_cos, n2n3 * (1 - angle_cos) + n1 * angle_sin, 0],
     [n1n3 * (1 - angle_cos) + n2 * angle_sin, n2n3 * (1 - angle_cos) - n1 * angle_sin, n3_pow + (1 - n3_pow) * angle_cos, 0],
     [0, 0, 0, 1],

@@ -74,7 +74,7 @@ def mk_faces_containers(edges_container) -> list[FaceContainer]:
     angle = np.dot(direction, normal)
     angle = np.arccos(angle)
     # check for vector opposite direction case (direction inside figure instead of outside)
-    if angle >= 90: normal *= -1
+    if angle >= np.pi / 2: normal *= -1
     result.append(FaceContainer(edges, normal, center))
 
   return result
