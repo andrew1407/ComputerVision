@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" data-badge="1">
   <!-- A wireframe cube watched by an eye with a lens iris: computer graphics meets computer vision, on a round outlined badge -->
-  <circle cx="32" cy="32" r="30.5" fill="#ffffff" stroke="#3557d6" stroke-width="3"/>
-  <svg x="12.5" y="12.5" width="39" height="39" viewBox="-1 -1 66 66">
+  <circle cx="32" cy="32" r="30" fill="#ffffff" stroke="#3557d6" stroke-width="4"/>
+  <svg x="11.5" y="11.5" width="41" height="41" viewBox="4.4 1.65 58.2 58.2">
     <g fill="none" stroke="#3557d6" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
     <path d="M6 22h28v28H6zM20 6h28v28H20zM6 22 20 6M34 22 48 6M6 50 20 34M34 50 48 34"/>
     </g>
