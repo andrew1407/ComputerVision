@@ -258,7 +258,19 @@ def _read(lab_dir, rel):
   return img
 
 
-def lab7(image, y0, y1, x0, x1, fp):
+_RAW = {}  # raw arrays kept for the page's GPU mode, handed over once as bytes by raw_take()
+
+
+def _keep(key, arr):
+  _RAW[key] = np.ascontiguousarray(arr).tobytes()
+  return dict(key=key, shape=list(arr.shape), dtype=str(arr.dtype))
+
+
+def raw_take(key):
+  return _RAW.pop(str(key))
+
+
+def lab7(image, y0, y1, x0, x1, fp, raw=False):
   import cv2
   L, lab_dir = load_lab('7-lab', assign=dict(fp=fp))
   img = _read(lab_dir, image or L['IMGNAME'])
@@ -278,10 +290,24 @@ def lab7(image, y0, y1, x0, x1, fp):
   # the curve the lab's LUT applies, read back by running it on a 0..255 ramp
   table = L['stretch_contrast'](np.arange(256, dtype=np.uint8).reshape(1, 256)).flatten()
   return dict(width=w, height=h, mask=[int(y0), int(y1), int(x0), int(x1)], mask_px=int(mask.sum()),
-              panels=panels, lut=[int(v) for v in table], ms=round(ms, 1), source=image or L['IMGNAME'])
+              panels=panels, lut=[int(v) for v in table], ms=round(ms, 1), source=image or L['IMGNAME'],
+              **(_lab7_raw(L, img, mask, masked_img, img_stretched, img_norm, fp) if raw else {}))
 
 
-def lab8(images, max_side):
+def _lab7_raw(L, img, mask, masked_img, img_stretched, img_norm, fp):
+  # GPU mode: time each call on its own and keep the arrays so the page can check its shader port
+  import cv2
+  times = {}
+  for name, fn in (('mask', lambda: cv2.bitwise_and(img, img, mask=mask)), ('lut', lambda: L['stretch_contrast'](img)),
+                   ('norm', lambda: cv2.normalize(masked_img, None, 0, 255, cv2.NORM_MINMAX)),
+                   ('hist', lambda: [_hist(img), _hist(masked_img, mask), _hist(img_stretched), _hist(img_norm, mask)])):
+    t0 = perf_counter(); fn(); times[name] = round((perf_counter() - t0) * 1000, 2)
+  fp_values = [float(v) for v in eval(fp, dict(np=np))] if fp else [0, 64, 128, 240, 255]
+  return dict(times=times, fp_values=fp_values, raw=dict(img=_keep('7/img', img), masked=_keep('7/masked', masked_img),
+              stretched=_keep('7/stretched', img_stretched), norm=_keep('7/norm', img_norm)))
+
+
+def lab8(images, max_side, raw=False):
   import cv2
   L, lab_dir = load_lab('8-lab')
   S, _ = load_lab('8-lab', 'segmentation.py')
@@ -317,7 +343,9 @@ def lab8(images, max_side):
                     panels=panels, times=times, gray_hist=_hist(gray)[0], otsu=float(thr),
                     centers=[dict(rgb=[int(v) for v in c], pixels=int(n)) for c, n in zip(colors, counts)],
                     robert_range=[round(lo, 3), round(hi, 3)],
-                    otsu_white=int((results['otsu'] > 0).sum())))
+                    otsu_white=int((results['otsu'] > 0).sum()),
+                    **(dict(raw=dict(img=_keep(f'8/{rel}/img', img), gray=_keep(f'8/{rel}/gray', gray), otsu=_keep(f'8/{rel}/otsu', results['otsu']),
+                                     kmeans=_keep(f'8/{rel}/kmeans', km), robert=_keep(f'8/{rel}/robert', rob), robert_disp=_keep(f'8/{rel}/robert_disp', rob_disp))) if raw else {})))
   return dict(images=out)
 
 

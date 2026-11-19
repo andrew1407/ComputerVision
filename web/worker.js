@@ -1,5 +1,5 @@
 // Web Worker that runs the labs' Python (Pyodide) off the page's main thread, so a lab never freezes the page.
-// Messages in: {id, type: 'run' | 'ensure', name, params}. Messages out: {type: 'ready'} | {type: 'failed', error} | {id, result} | {id, error}.
+// Messages in: {id, type: 'run' | 'ensure' | 'raw', name, params}; 'raw' hands over an array kept for the GPU mode as bytes. Messages out: {type: 'ready'} | {type: 'failed', error} | {id, result} | {id, error}.
 // Plain postMessage with JSON strings: no SharedArrayBuffer needed, so it works on GitHub Pages without COOP/COEP.
 import { loadPyodide } from 'https://cdn.jsdelivr.net/pyodide/v314.0.3/full/pyodide.mjs';  // the Pyodide PyScript 2026.7.3 uses
 
@@ -29,6 +29,12 @@ boot.then(() => postMessage({ type: 'ready' }), (e) => postMessage({ type: 'fail
 onmessage = async ({ data: { id, type, name, params } }) => {
   try {
     const g = await boot;
+    if (type === 'raw') {
+      const bytes = g.get('showcase').raw_take(name);
+      const result = bytes.toJs();
+      bytes.destroy();
+      return postMessage({ id, result }, [result.buffer]);
+    }
     const result = type === 'ensure' ? await g.get('ensure')(params) : g.get('run')(name, params);
     postMessage({ id, result });
   } catch (e) {

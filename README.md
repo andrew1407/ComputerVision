@@ -36,11 +36,12 @@ OpenCV, NumPy and Matplotlib.
 - **Labs 1–5 and `control-task`** run their `main.py` and `graphics.py` unchanged. [`web/shims/tkinter.py`](web/shims/tkinter.py) stands in for Tk and records every canvas call, and `time.sleep` advances a virtual clock. The page replays the drawing on an HTML canvas at the lab's timing, including the click `getMouse()` waits for.
 - **Lab 6** runs `bearing.py` and `hollow_cylinder.py` unchanged against [`web/shims/OpenGL`](web/shims/OpenGL), a stand-in for PyOpenGL. The page calls the lab's GLUT display callback every animation frame and draws the result with WebGL, using OpenGL 1.x's fixed-function lighting. That part is a port, because browsers have no desktop OpenGL.
 - **Labs 7 and 8** call the labs' OpenCV and SciPy functions on the repo's images or an uploaded one. The page draws the images and histograms that matplotlib would show.
+- **GPU mode (labs 7 and 8)**, offered only when the browser has WebGPU or WebGL2 with float render targets: a CPU / GPU switch also runs [`web/gpu`](web/gpu), a port of the labs' OpenCV and SciPy calls to WebGPU compute shaders (or WebGL2 fragment shaders and point scatters), and checks every image and histogram against OpenCV's own arrays. The port computes in f32 on the GPU and isn't the lab's own code; k-means runs one deterministic attempt instead of `cv2.kmeans`'s random k-means++ seeding.
 
 [`web/showcase.py`](web/showcase.py) loads the labs. Run it locally:
 
 ```sh
-mkdir -p _site/web && cp web/*.html web/*.js web/*.py web/*.toml web/*.svg _site/web/ && cp -r web/shims _site/web/
+mkdir -p _site/web && cp web/*.html web/*.js web/*.py web/*.toml web/*.svg _site/web/ && cp -r web/shims web/gpu _site/web/
 cp -r 1-lab 2-lab 3-lab 4-lab 5-lab 6-lab 7-lab 8-lab control-task _site/
 cd _site && python -m http.server    # then open http://localhost:8000/web/
 ```

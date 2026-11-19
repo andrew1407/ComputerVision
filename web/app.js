@@ -5,6 +5,8 @@
 //  - lab 6 runs against an OpenGL recorder (shims/OpenGL) and is drawn with WebGL,
 //  - labs 7 and 8 call the lab's OpenCV functions on the repo's images or yours.
 
+import * as GPU from './gpu/labs.js';
+
 const REPO = 'https://github.com/Andrew1407/ComputerVision';
 const SRC = `${REPO}/blob/main`;
 const TREE = `${REPO}/tree/main`;
@@ -51,6 +53,7 @@ const post = (type, name, params) => py.then(() => new Promise((resolve, reject)
   worker.postMessage({ id, type, name, params });
 }));
 const whenPy = () => py;
+const takeRaw = (key) => post('raw', key); // an OpenCV array kept for the GPU check, as bytes
 
 async function pyCall(name, params = {}) {
   const res = JSON.parse(await post('run', name, JSON.stringify(params)));
@@ -828,20 +831,20 @@ function lab7View(d) {
       <div style="min-width:0">${chart({ title: `Histogram: ${p.title}${p.masked ? ' (masked)' : ''}`, x: 'intensity', y: 'pixels', series, yZero: true })}</div></div>`;
   }).join('');
   return `<div class="stats">${stat(`${d.width}×${d.height}`, 'image size')}${stat(`[${d.mask[0]}:${d.mask[1]}, ${d.mask[2]}:${d.mask[3]}]`, 'mask rows, columns')}${stat(int(d.mask_px), 'pixels in the mask')}${stat(msFmt(d.ms), 'OpenCV time')}</div>
-    ${rows}
+    ${d.gpu ? GPU.view7(d) : ''}${rows}
     <div class="charts" style="max-width:560px">${chart({ title: 'stretch_contrast lookup table', x: 'input intensity', y: 'output', series: [{ name: 'cv2.LUT table', xs: xs256, ys: d.lut, color: '--c4' }, { name: 'identity', xs: xs256, ys: xs256, color: '--muted', dash: true, width: 1 }], height: 230 })}</div>`;
 }
 
 const SEG_TITLES = { original: 'original', otsu: 'otsu', kmeans: 'kmeans', robert: 'robert' };
 function lab8View(d) {
-  return d.images.map((im) => {
+  return (d.gpu ? `<div class="notes"><p class="note port">${GPU.HONEST}</p></div>${GPU.KMEANS_NOTE}` : '') + d.images.map((im) => {
     const t = im.times;
     const scaled = im.width !== im.orig_width;
     const centers = im.centers.map((c) => `<span class="swatch" style="background:rgb(${c.rgb.join(',')})"></span>`).join('');
     const figs = im.panels.map((p) => imgFigure(p.image, SEG_TITLES[p.key], p.key === 'original' ? '' : msFmt(t[p.key]))).join('');
     return `<div class="src-group" data-group="${esc(im.source)}"><h2>${esc(im.source)} <small>· ${im.orig_width}×${im.orig_height}${scaled ? `, processed at ${im.width}×${im.height}` : ''}</small></h2>
       <div class="stats">${stat(fmt(im.otsu, 1), 'Otsu threshold')}${stat(`${fmt((100 * im.otsu_white) / (im.width * im.height), 1)}%`, 'white after THRESH_BINARY_INV')}${stat(`${centers}<span style="font-size:13px">${im.centers.map((c) => `#${c.rgb.map((v) => v.toString(16).padStart(2, '0')).join('')}`).join(' ')}</span>`, 'k-means centres (k = 2)')}${stat(msFmt(t.kmeans), 'k-means time')}${stat(`${fmt(im.robert_range[0], 1)} … ${fmt(im.robert_range[1], 1)}`, 'Roberts magnitude range')}</div>
-      <div class="imgs quad" style="margin-bottom:16px">${figs}</div>
+      ${im.gpu ? GPU.view8(im) : ''}<div class="imgs quad" style="margin-bottom:16px">${figs}</div>
       <div class="charts two">
         ${chart({ title: `Grey levels of ${im.source}`, x: 'intensity', y: 'pixels', series: [{ name: 'grey', xs: xs256, ys: im.gray_hist, color: '--c1' }], marks: [{ x: im.otsu, label: `Otsu threshold ${fmt(im.otsu, 1)}`, short: `T = ${fmt(im.otsu, 1)}`, color: '--c2' }], yZero: true })}
         ${chart({ title: 'Roberts edge magnitude (as plotted)', x: 'scaled magnitude', y: 'pixels', series: [{ name: 'edges', xs: xs256, ys: im.panels[3].hist[0], color: '--c4' }], yZero: true })}
@@ -979,13 +982,15 @@ const LABS = [
     notes: ['<p class="note port"><b>Plotting redrawn on the page.</b> The lab\'s functions (<code>stretch_contrast</code> and the OpenCV calls) run in Pyodide\'s OpenCV. Its matplotlib figures are drawn here as images and SVG charts. The lab plots channel 0 of OpenCV\'s BGR images, which is blue; the other two channels are drawn lighter for comparison.</p>'],
     hint: 'The mask is <code>mask[350:550, 300:700] = 1</code> in <code>main.py</code>. For your own image, pick rows and columns inside it.',
     run: async (p, out) => {
+      const gpu = await GPU.gpuOn('lab7');
       await ensurePackages(['opencv-python'], out);
       let image = null;
       if (p.source === 'upload') image = await uploadImage('7-lab', out);
       else await ensureFile('7-lab', 'imgs/landscape.jpg');
-      return runPy('lab7', { image, y0: p.y0, y1: p.y1, x0: p.x0, x1: p.x1, fp: String(p.fp) });
+      const d = await runPy('lab7', { image, y0: p.y0, y1: p.y1, x0: p.x0, x1: p.x1, fp: String(p.fp), ...(gpu ? { raw: true } : {}) });
+      return gpu ? GPU.runLab7(d, takeRaw) : d;
     },
-    render: lab7View, mount: 'img',
+    render: lab7View, mount: 'img', gpu: true,
   },
   {
     id: 'lab8', tab: '8', dir: '8-lab', name: 'Segmentation', lang: 'cv', src: `${TREE}/8-lab`,
@@ -998,6 +1003,7 @@ const LABS = [
     notes: ['<p class="note port"><b>Plotting redrawn on the page.</b> <code>segmentation.py</code> and <code>original()</code> run unchanged in Pyodide\'s OpenCV and SciPy. The page draws the 2×2 <code>plt.imshow</code> grid and skips <code>write_img</code>, which saves the results next to the inputs. matplotlib stretches the float Roberts image from its minimum to its maximum, so the page does the same.</p>'],
     hint: 'The lab segments the images at full size (1076×938 and 1256×845). k-means takes several seconds per image at that size in the browser, so by default the page scales them to 640 px on the long side first. Set 0 for full size.',
     run: async (p, out) => {
+      const gpu = await GPU.gpuOn('lab8');
       await ensurePackages(['opencv-python', 'scipy'], out);
       let list;
       if (p.source === 'upload') list = [await uploadImage('8-lab', out)];
@@ -1005,9 +1011,10 @@ const LABS = [
         list = p.source === 'repo' ? ['imgs/raw1.png', 'imgs/ref1.png'] : [`imgs/${p.source}.png`];
         for (const rel of list) await ensureFile('8-lab', rel);
       }
-      return runPy('lab8', { images: list, max_side: p.max_side });
+      const d = await runPy('lab8', { images: list, max_side: p.max_side, ...(gpu ? { raw: true } : {}) });
+      return gpu ? GPU.runLab8(d, takeRaw) : d;
     },
-    render: lab8View, mount: 'img',
+    render: lab8View, mount: 'img', gpu: true,
   },
   {
     id: 'control', tab: 'CT', dir: 'control-task', name: 'Back-face culling', lang: 'py', src: `${SRC}/control-task/main.py`,
@@ -1056,7 +1063,7 @@ function build() {
     const b = document.createElement('button');
     b.type = 'button'; b.role = 'tab'; b.dataset.lab = lab.id;
     b.setAttribute('aria-controls', `panel-${lab.id}`);
-    b.innerHTML = `<span class="lang ${lab.lang}">${short}</span>${labName(lab)}<span class="long muted" style="font-weight:400">· ${esc(lab.name)}</span>`;
+    b.innerHTML = `<span class="lang ${lab.lang}">${short}</span>${lab.gpu ? '<span class="lang gpu-badge" title="Has a WebGPU / WebGL2 mode">GPU</span>' : ''}${labName(lab)}<span class="long muted" style="font-weight:400">· ${esc(lab.name)}</span>`;
     b.onclick = () => select(lab.id, true);
     nav.appendChild(b);
 
@@ -1080,6 +1087,7 @@ function build() {
     form.addEventListener('change', sync); sync();
     form.addEventListener('submit', (e) => { e.preventDefault(); run(lab); });
     $('[data-reset]', form).onclick = () => { form.reset(); sync(); };
+    if (lab.gpu) GPU.mountControl(form, lab.id, () => run(lab));
     const file = $('input[type="file"]', form);
     if (file) file.addEventListener('change', () => { if (file.files[0]) run(lab); });
 
@@ -1137,6 +1145,7 @@ async function run(lab) {
     if (lab.mount === 'tk') new TkSession($('.tk-session', out), data);
     if (lab.mount === 'gl') new GLView($('.gl-box', out), data);
     if (lab.mount === 'img') await paintImages(out);
+    if (data.gpu) { GPU.attach(out, data.images ? data.images.map((im) => im.gpu) : [data.gpu]); GPU.mount(out); }
   } catch (e) {
     console.error(e);
     out.innerHTML = `<div class="err">${esc(e.message || e)}</div>`;
