@@ -1,13 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" data-badge="1">
   <!-- A wireframe cube watched by an eye with a lens iris: computer graphics meets computer vision, on a round outlined badge -->
-  <circle cx="32" cy="32" r="30" fill="#ffffff" stroke="#3557d6" stroke-width="4"/>
+  <circle cx="32" cy="32" r="30" fill="#ffffff" stroke="#ec7a4f" stroke-width="4"/>
   <svg x="11.5" y="11.5" width="41" height="41" viewBox="4.4 1.65 58.2 58.2">
-    <g fill="none" stroke="#3557d6" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+    <g fill="none" stroke="#ec7a4f" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
     <path d="M6 22h28v28H6zM20 6h28v28H20zM6 22 20 6M34 22 48 6M6 50 20 34M34 50 48 34"/>
     </g>
-    <path d="M19 45Q40 24 61 45 40 66 19 45Z" fill="#d8ecfb" stroke="#4a90c8" stroke-width="2.6" stroke-linejoin="round"/>
+    <path d="M19 45Q40 24 61 45 40 66 19 45Z" fill="#ffe7da" stroke="#f4a27e" stroke-width="2.6" stroke-linejoin="round"/>
     <circle cx="40" cy="45" r="8.6" fill="#fbf1cc" stroke="#b8971b" stroke-width="2.6"/>
-    <circle cx="40" cy="45" r="3.6" fill="#1f4f80"/>
+    <circle cx="40" cy="45" r="3.6" fill="#9c4421"/>
     <circle cx="43" cy="41.6" r="1.5" fill="#fbf1cc"/>
   </svg>
 </svg>
