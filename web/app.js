@@ -1,5 +1,5 @@
 // Computer Vision Labs showcase: lab panels, canvas players, WebGL and SVG charts.
-// Every lab runs its own Python through PyScript (bridge.py, showcase.py):
+// Every lab runs its own Python through PyScript, in a worker (bridge.py, showcase.py):
 //  - labs 1-5 and the control task run main.py against a tkinter recorder
 //    (shims/tkinter.py); the page replays the log on a canvas,
 //  - lab 6 runs against an OpenGL recorder (shims/OpenGL) and is drawn with WebGL,
@@ -23,25 +23,24 @@ const stat = (value, label, cls = '') => `<div class="stat ${cls}"><b>${value}</
 const int = (v) => Math.round(v).toLocaleString('en-US');
 
 // ---------------------------------------------------------------- runtimes --
+// The Python runs in a PyScript worker (bridge.py), so the page never freezes
+// while a lab computes. Calls are async messages, JSON in and JSON out.
+import { PyWorker } from 'https://pyscript.net/releases/2026.7.3/core.js';
+
 let pyReady = false;
-const pyWaiters = [];
-window.addEventListener('py-ready', () => {
+const py = PyWorker('./bridge.py', { config: './pyscript.toml' }).then((w) => {
   pyReady = true;
   document.querySelectorAll('.py-status').forEach((el) => el.remove());
-  pyWaiters.splice(0).forEach((f) => f());
+  return w.sync;
 });
-const whenPy = () => (pyReady ? Promise.resolve() : new Promise((r) => pyWaiters.push(r)));
+const whenPy = () => py;
 
-function pyCall(name, params = {}) {
-  const res = JSON.parse(window.pyRun(name, JSON.stringify(params)));
+async function pyCall(name, params = {}) {
+  const res = JSON.parse(await (await py).run(name, JSON.stringify(params)));
   if (!res.ok) throw new Error(res.error);
   return res.data;
 }
-async function runPy(name, params) {
-  await whenPy();
-  await pause();
-  return pyCall(name, params);
-}
+const runPy = pyCall;
 
 // OpenCV and SciPy are big, so they're only fetched when lab 7 or 8 is opened
 const loaded = new Set();
@@ -56,7 +55,7 @@ async function ensurePackages(pkgs, out) {
   box.setAttribute('role', 'status');
   box.innerHTML = `<span class="spinner" aria-hidden="true"></span><div><b>Loading ${missing.map((p) => (p === 'opencv-python' ? 'OpenCV' : 'SciPy')).join(' and ')} for WebAssembly…</b><small>About ${mb} MB on the first visit, cached after that.</small></div><div class="bar" aria-hidden="true"><i></i></div>`;
   out.before(box);
-  try { await window.pyEnsure(JSON.stringify(missing)); missing.forEach((p) => loaded.add(p)); }
+  try { await (await py).ensure(JSON.stringify(missing)); missing.forEach((p) => loaded.add(p)); }
   finally { box.remove(); }
 }
 
@@ -68,7 +67,7 @@ async function ensureFile(lab, rel) {
   if (fetched.has(key)) return;
   const resp = await fetch(`../${lab}/${rel}`);
   if (!resp.ok) throw new Error(`Couldn't fetch ${key} (${resp.status})`);
-  pyCall('put_file', { lab, rel, data_b64: await toB64(await resp.blob()) });
+  await pyCall('put_file', { lab, rel, data_b64: await toB64(await resp.blob()) });
   fetched.add(key);
 }
 
@@ -620,6 +619,8 @@ const m4 = {
   },
 };
 
+const GL_AHEAD = 12; // display callbacks the worker computes per request
+
 class GLView {
   constructor(root, data) {
     this.root = root; this.data = data; this.playing = true; this.yaw = 0; this.pitch = 0; this.frames = 0; this.fpsT = performance.now(); this.fpsN = 0;
@@ -634,7 +635,7 @@ class GLView {
     gl.useProgram(prog);
     this.loc = Object.fromEntries(['aPos', 'aNrm', 'aCol'].map((n) => [n, gl.getAttribLocation(prog, n)]));
     this.uni = Object.fromEntries(['uMV', 'uP', 'uN', 'uLight', 'uLighting', 'uNormalize'].map((n) => [n, gl.getUniformLocation(prog, n)]));
-    this.lists = {};
+    this.lists = {}; this.queue = [];
     for (const [id, g] of Object.entries(data.lists)) {
       const buf = (arr) => { const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(arr), gl.STATIC_DRAW); return b; };
       this.lists[id] = { pos: buf(g.pos), nrm: buf(g.nrm), col: buf(g.col), n: g.pos.length / 3 };
@@ -652,7 +653,7 @@ class GLView {
     const playBtn = $('[data-gl-play]', r);
     const sync = () => { playBtn.innerHTML = this.playing ? PAUSE : PLAY; };
     playBtn.onclick = () => { this.playing = !this.playing; sync(); if (this.playing) this.kick(); };
-    $('[data-gl-step]', r).onclick = () => { this.playing = false; sync(); this.frame(); };
+    $('[data-gl-step]', r).onclick = () => { this.playing = false; sync(); this.step(); };
     $('[data-gl-reset]', r).onclick = () => { this.yaw = 0; this.pitch = 0; if (!this.playing) this.render(this.last); };
     sync();
     let drag = null;
@@ -669,12 +670,16 @@ class GLView {
   }
 
   // like GLUT calling the reshape callback when the window size changes
-  resize() {
+  async resize() {
     const css = this.canvas.clientWidth || 600, dpr = Math.min(2, window.devicePixelRatio || 1);
     const w = Math.round(css * dpr), h = w;
     if (w === this.canvas.width && h === this.canvas.height && this.shaped) return;
     this.canvas.width = w; this.canvas.height = h; this.shaped = true;
-    this.viewport = pyCall('gl_reshape', { w, h }).viewport;
+    this.gen = (this.gen || 0) + 1; // frames computed before the reshape keep the old projection
+    this.queue = [];
+    const shaping = pyCall('gl_reshape', { w, h });
+    this.shaping = shaping;
+    this.viewport = (await shaping).viewport;
     if (this.last) this.render(this.last);
   }
 
@@ -684,20 +689,49 @@ class GLView {
     this.raf = 0;
     if (!this.root.isConnected) { this.ro.disconnect(); return; }
     if (!this.playing) return;
-    if (this.canvas.offsetParent) {
-      this.frame();
+    if (this.canvas.offsetParent && this.frame()) {
       this.fpsN++;
       if (now - this.fpsT > 500) { $('[data-gl-fps]', this.root).textContent = `${Math.round((this.fpsN * 1000) / (now - this.fpsT))} fps`; this.fpsT = now; this.fpsN = 0; }
     }
     this.raf = requestAnimationFrame(this.tick);
   }
 
-  // one GLUT display callback: bearing.draw() runs in Python and hands back its draw calls
+  // GLUT display callbacks: bearing.draw() runs in the Python worker and hands
+  // back its draw calls. The worker computes a batch of frames ahead, so a
+  // message round trip never holds up an animation frame.
+  refill() {
+    if (this.fetching || this.queue.length >= GL_AHEAD / 2) return;
+    const gen = this.gen;
+    this.fetching = (async () => {
+      try {
+        await this.shaping;
+        const frames = await pyCall('gl_frames', { n: GL_AHEAD });
+        if (gen === this.gen) this.queue.push(...frames);
+      } catch (e) { this.fail(e); }
+      finally { this.fetching = null; }
+    })();
+  }
+
+  fail(e) {
+    if (this.failed) return;
+    this.failed = true; this.playing = false;
+    console.error(e);
+    this.root.insertAdjacentHTML('beforeend', `<div class="err">${esc(e.message || e)}</div>`);
+  }
+
+  // shows the next display callback; false when the worker hasn't sent it yet
   frame() {
-    const f = pyCall('gl_frame');
+    const f = this.queue.shift();
+    this.refill();
+    if (!f) return false;
     this.last = f;
     this.render(f);
     $('[data-gl-frame]', this.root).textContent = `frame ${int(f.frame)}`;
+    return true;
+  }
+
+  async step() {
+    for (let i = 0; i < 100 && !this.frame() && !this.failed; i++) await (this.fetching || pause());
   }
 
   render(f) {
@@ -981,7 +1015,7 @@ async function uploadImage(lab, out) {
   const file = input?.files?.[0];
   if (!file) throw new Error('Choose an image file to upload first.');
   if (file.size > 25e6) throw new Error('That image is over 25 MB. Pick a smaller one.');
-  return pyCall('save_upload', { lab, name: file.name, data_b64: await toB64(file) });
+  return await pyCall('save_upload', { lab, name: file.name, data_b64: await toB64(file) });
 }
 
 // --------------------------------------------------------------- framework --
@@ -1066,11 +1100,20 @@ async function run(lab) {
   const bad = invalid(lab, p);
   if (bad) { out.innerHTML = `<div class="err">${esc(bad)}</div>`; return; }
   st.running = true; st.ran = true;
-  btn.disabled = true; btn.textContent = !pyReady ? 'Waiting for Python…' : 'Running…';
+  btn.disabled = true;
+  const t0 = performance.now();
+  const label = () => {
+    const sec = Math.floor((performance.now() - t0) / 1000);
+    btn.textContent = `${pyReady ? 'Running…' : 'Waiting for Python…'}${sec ? ` ${sec} s` : ''}`;
+  };
+  label();
+  const timer = setInterval(label, 250);
   out.style.opacity = '.45';
   try {
     const data = await lab.run(p, out);
+    clearInterval(timer);
     btn.textContent = 'Running…';
+    await pause(); // let the button repaint before the results are drawn
     out.innerHTML = `<div class="out-actions">${actions('results')}</div>` + lab.render(data, lab);
     drawCharts(out);
     if (lab.mount === 'tk') new TkSession($('.tk-session', out), data);
@@ -1080,6 +1123,7 @@ async function run(lab) {
     console.error(e);
     out.innerHTML = `<div class="err">${esc(e.message || e)}</div>`;
   } finally {
+    clearInterval(timer);
     st.running = false; btn.disabled = false; btn.textContent = 'Run'; out.style.opacity = '';
   }
 }

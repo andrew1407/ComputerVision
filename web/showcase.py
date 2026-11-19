@@ -5,7 +5,8 @@ Graphics labs (1-5, control-task) run their own main.py top to bottom with
 shims/tkinter.py records what the lab's unchanged graphics.py draws, and a
 patched `time` module turns time.sleep into virtual time so the page can
 replay the animation. Lab 6 runs the same way against shims/OpenGL, and the
-page calls its GLUT display callback once per animation frame.
+page plays its GLUT display callback one call per animation frame, fetching
+them from the worker a batch ahead.
 
 Parameters typed on the page replace the matching assignments or keyword
 arguments in the parsed source (the files are never changed).
@@ -320,7 +321,12 @@ def lab8(images, max_side):
   return dict(images=out)
 
 
-RUNNERS = dict(graphics=graphics, gl_start=gl_start, gl_reshape=gl_reshape, gl_frame=gl_frame,
+def gl_frames(n=1):
+  # the page asks for a batch of display callbacks at once and plays them one per animation frame
+  return [gl_frame() for _ in range(max(1, int(n)))]
+
+
+RUNNERS = dict(graphics=graphics, gl_start=gl_start, gl_reshape=gl_reshape, gl_frame=gl_frame, gl_frames=gl_frames,
                lab7=lab7, lab8=lab8, save_upload=save_upload)
 
 
