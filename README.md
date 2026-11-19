@@ -31,7 +31,7 @@ OpenCV, NumPy and Matplotlib.
 
 ## Showcase
 
-**[Open the labs in the browser](https://andrew1407.github.io/ComputerVision/)**. Every lab runs its own Python source in [PyScript](https://pyscript.net) (Pyodide), with editable parameters, and every drawing, image, chart, table and result can be copied.
+**[Open the labs in the browser](https://andrew1407.github.io/ComputerVision/)**. Every lab runs its own Python source in [Pyodide](https://pyodide.org) inside a Web Worker, so the page stays responsive, with editable parameters, and every drawing, image, chart, table and result can be copied.
 
 - **Labs 1–5 and `control-task`** run their `main.py` and `graphics.py` unchanged. [`web/shims/tkinter.py`](web/shims/tkinter.py) stands in for Tk and records every canvas call, and `time.sleep` advances a virtual clock. The page replays the drawing on an HTML canvas at the lab's timing, including the click `getMouse()` waits for.
 - **Lab 6** runs `bearing.py` and `hollow_cylinder.py` unchanged against [`web/shims/OpenGL`](web/shims/OpenGL), a stand-in for PyOpenGL. The page calls the lab's GLUT display callback every animation frame and draws the result with WebGL, using OpenGL 1.x's fixed-function lighting. That part is a port, because browsers have no desktop OpenGL.

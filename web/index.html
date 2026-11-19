@@ -6,9 +6,7 @@
   <title>Computer Vision Labs</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <script src="theme.js"></script>
-  <meta name="description" content="Run the ComputerVision labs in your browser: 2D/3D transforms, raster and vector algorithms, fractals and an OpenGL bearing drawn by the labs' own Python through PyScript, plus OpenCV histograms and segmentation.">
-  <link rel="stylesheet" href="https://pyscript.net/releases/2026.7.3/core.css">
-  <script type="module" src="https://pyscript.net/releases/2026.7.3/core.js"></script>
+  <meta name="description" content="Run the ComputerVision labs in your browser: 2D/3D transforms, raster and vector algorithms, fractals and an OpenGL bearing drawn by the labs' own Python through Pyodide, plus OpenCV histograms and segmentation.">
   <style>
     :root {
       --bg: #f6f7f9; --panel: #ffffff; --ink: #1b1f24; --muted: #5d6673; --line: #dfe3e8; --grid: #eceff3;
@@ -218,7 +216,7 @@
     <img src="icon.svg" alt="" width="52" height="52">
     <div>
       <h1>Computer Vision Labs</h1>
-      <p>The <a href="https://github.com/Andrew1407/ComputerVision">ComputerVision</a> labs, running in your browser. Every lab runs its own Python source through PyScript: the drawings come from the labs' unchanged <code>graphics.py</code> and OpenGL code, and the image labs use OpenCV compiled for WebAssembly.</p>
+      <p>The <a href="https://github.com/Andrew1407/ComputerVision">ComputerVision</a> labs, running in your browser. Every lab runs its own Python source through Pyodide in a Web Worker: the drawings come from the labs' unchanged <code>graphics.py</code> and OpenGL code, and the image labs use OpenCV compiled for WebAssembly.</p>
     </div>
     <button class="theme-toggle" data-theme-toggle></button>
   </header>

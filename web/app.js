@@ -1,5 +1,5 @@
 // Computer Vision Labs showcase: lab panels, canvas players, WebGL and SVG charts.
-// Every lab runs its own Python through PyScript, in a worker (bridge.py, showcase.py):
+// Every lab runs its own Python in a Pyodide Web Worker (worker.js, bridge.py, showcase.py):
 //  - labs 1-5 and the control task run main.py against a tkinter recorder
 //    (shims/tkinter.py); the page replays the log on a canvas,
 //  - lab 6 runs against an OpenGL recorder (shims/OpenGL) and is drawn with WebGL,
@@ -23,20 +23,37 @@ const stat = (value, label, cls = '') => `<div class="stat ${cls}"><b>${value}</
 const int = (v) => Math.round(v).toLocaleString('en-US');
 
 // ---------------------------------------------------------------- runtimes --
-// The Python runs in a PyScript worker (bridge.py), so the page never freezes
-// while a lab computes. Calls are async messages, JSON in and JSON out.
-import { PyWorker } from 'https://pyscript.net/releases/2026.7.3/core.js';
-
-let pyReady = false;
-const py = PyWorker('./bridge.py', { config: './pyscript.toml' }).then((w) => {
-  pyReady = true;
-  document.querySelectorAll('.py-status').forEach((el) => el.remove());
-  return w.sync;
+// The Python runs in a Pyodide Web Worker (worker.js -> bridge.py -> showcase.py),
+// so the page never freezes while a lab computes. Calls are postMessage round
+// trips with JSON strings, which need no SharedArrayBuffer.
+const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
+const pending = new Map();
+let pySeq = 0, pyReady = false;
+const py = new Promise((resolve, reject) => {
+  worker.onmessage = ({ data }) => {
+    if (data.type === 'ready') {
+      pyReady = true;
+      document.querySelectorAll('.py-status').forEach((el) => el.remove());
+      return resolve();
+    }
+    if (data.type === 'failed') {
+      document.querySelectorAll('.py-status').forEach((el) => { el.classList.add('slow'); $('.note-text', el).textContent = `Python failed to start: ${data.error}`; });
+      return reject(new Error(data.error));
+    }
+    const call = pending.get(data.id);
+    pending.delete(data.id);
+    if (data.error) call.reject(new Error(data.error)); else call.resolve(data.result);
+  };
 });
+const post = (type, name, params) => py.then(() => new Promise((resolve, reject) => {
+  const id = ++pySeq;
+  pending.set(id, { resolve, reject });
+  worker.postMessage({ id, type, name, params });
+}));
 const whenPy = () => py;
 
 async function pyCall(name, params = {}) {
-  const res = JSON.parse(await (await py).run(name, JSON.stringify(params)));
+  const res = JSON.parse(await post('run', name, JSON.stringify(params)));
   if (!res.ok) throw new Error(res.error);
   return res.data;
 }
@@ -55,7 +72,7 @@ async function ensurePackages(pkgs, out) {
   box.setAttribute('role', 'status');
   box.innerHTML = `<span class="spinner" aria-hidden="true"></span><div><b>Loading ${missing.map((p) => (p === 'opencv-python' ? 'OpenCV' : 'SciPy')).join(' and ')} for WebAssembly…</b><small>About ${mb} MB on the first visit, cached after that.</small></div><div class="bar" aria-hidden="true"><i></i></div>`;
   out.before(box);
-  try { await (await py).ensure(JSON.stringify(missing)); missing.forEach((p) => loaded.add(p)); }
+  try { await post('ensure', null, JSON.stringify(missing)); missing.forEach((p) => loaded.add(p)); }
   finally { box.remove(); }
 }
 
@@ -1101,8 +1118,9 @@ async function run(lab) {
   if (bad) { out.innerHTML = `<div class="err">${esc(bad)}</div>`; return; }
   st.running = true; st.ran = true;
   btn.disabled = true;
-  const t0 = performance.now();
+  let t0 = performance.now();
   const label = () => {
+    if (!pyReady) t0 = performance.now(); // the loading notice counts the wait for Python
     const sec = Math.floor((performance.now() - t0) / 1000);
     btn.textContent = `${pyReady ? 'Running…' : 'Waiting for Python…'}${sec ? ` ${sec} s` : ''}`;
   };

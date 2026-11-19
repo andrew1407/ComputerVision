@@ -23,8 +23,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Nothing to compile: the labs are Python and run through PyScript (Pyodide).
-      # Mirror the repo layout so web/pyscript.toml can load ../1-lab/*.py and so on,
+      # Nothing to compile: the labs are Python and run through Pyodide in a Web Worker (web/worker.js).
+      # Mirror the repo layout so web/pyodide.toml can load ../1-lab/*.py and so on,
       # and the image labs can fetch ../7-lab/imgs and ../8-lab/imgs.
       - name: Assemble site
         run: |
